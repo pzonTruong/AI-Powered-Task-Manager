@@ -31,22 +31,45 @@ export default function Dashboard() {
     const handleMagicAdd = async (mainTaskText) => {
         if (!mainTaskText) return;
 
-        // A. Add the main task first
-        addTask(mainTaskText);
+        // 1. Create the Parent Task ID upfront
+        const parentId = Date.now();
 
-        // B. Call AI to get subtasks
+        const newParent = {
+            id: parentId,
+            text: mainTaskText,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            isParent: true // Tag it as a parent
+        };
+
+        // 2. Add Parent to the list immediately
+        setTasks(prev => [newParent, ...prev]);
+
+        // 3. Call AI (Wait for it...)
         const subTasks = await generateSubtasks(mainTaskText);
 
-        // C. Add the subtasks automatically
         if (subTasks.length > 0) {
             const newSubTasks = subTasks.map((sub, index) => ({
-                id: Date.now() + index + 1, // Ensure unique ID
-                text: `↳ ${sub}`, // Add an arrow to show it's a subtask
+                id: parentId + index + 1, // Unique ID based on parent
+                text: sub,
                 completed: false,
+                isSubtask: true, // Tag as subtask
                 createdAt: new Date().toISOString()
             }));
 
-            setTasks(prev => [...newSubTasks, ...prev]);
+            // 4. INSERT CORRECTLY: Parent -> Subtasks -> Rest of list
+            setTasks(prev => {
+                // Find where the parent is (it should be at index 0, but let's be safe)
+                const parentIndex = prev.findIndex(t => t.id === parentId);
+
+                if (parentIndex === -1) return [...newSubTasks, ...prev]; // Fallback
+
+                // Slice the array to insert in the middle
+                const tasksBeforeAndParent = prev.slice(0, parentIndex + 1); // [Parent]
+                const tasksAfter = prev.slice(parentIndex + 1);              // [Old Tasks...]
+
+                return [...tasksBeforeAndParent, ...newSubTasks, ...tasksAfter];
+            });
         }
     };
     // ------------------------------
