@@ -56,7 +56,7 @@ Implements complex reordering logic using `@dnd-kit`.
 
 1.  **Clone the repository**
     ```bash
-    git clone [https://github.com/your-username/smart-todo-app.git](https://github.com/your-username/smart-todo-app.git)
+    git clone [https://github.com/pzonTruong/smart-todo-app.git](https://github.com/pzonTruong/smart-todo-app.git)
     cd smart-todo-app
     ```
 
