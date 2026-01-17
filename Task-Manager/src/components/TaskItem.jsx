@@ -1,47 +1,59 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+// 1. IMPORT DND-KIT HOOKS
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdit }) {
   const { isDarkMode } = useTheme();
+  
+  // 2. SETUP SORTABLE HOOK
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: task.id });
 
-  // LOGIC CHANGE: If text is empty, start in Edit Mode automatically
+  // 3. DEFINE DRAG STYLE
+  const dndStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1, // Fade out while dragging
+    zIndex: isDragging ? 999 : 'auto',
+    position: 'relative',
+    touchAction: 'none' // Important for mobile dragging
+  };
+
   const [isEditing, setIsEditing] = useState(task.text === "");
   const [editText, setEditText] = useState(task.text);
 
-  // Handle saving
   const handleSave = () => {
     if (editText.trim()) {
-      // Valid text: Save it
       onEdit(task.id, editText);
       setIsEditing(false);
     } else {
-      // Empty text: Delete the task (don't allow blank tasks)
       onDelete(task.id);
     }
   };
 
-  // Handle cancelling
   const handleCancel = () => {
     if (!task.text) {
-      // If it was a new blank task and user cancels -> Delete it
       onDelete(task.id);
     } else {
-      // If it was an existing task -> Revert text
       setEditText(task.text);
       setIsEditing(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      handleCancel();
-    }
+    if (e.key === 'Enter') handleSave();
+    else if (e.key === 'Escape') handleCancel();
   };
 
-  // LOGIC CHANGE: Just call the parent function, no prompt needed
   const handleAddSubClick = () => {
     onAddSubtask(task.id);
   };
@@ -57,19 +69,20 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
   };
 
   const itemStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    margin: '8px 0',
+    display: 'flex', 
+    alignItems: 'center', 
+    margin: '8px 0', 
     gap: '10px',
     padding: '12px',
     borderRadius: '8px',
-    transition: 'all 0.2s',
+    // Logic: Indent if subtask
     marginLeft: task.isSubtask ? '40px' : '0px',
     borderLeft: task.isSubtask ? '4px solid #646cff' : 'none',
-    backgroundColor: isDarkMode
-      ? (task.isSubtask ? '#2a2a2a' : '#333')
+    backgroundColor: isDarkMode 
+      ? (task.isSubtask ? '#2a2a2a' : '#333') 
       : (task.isSubtask ? '#f8f9fa' : '#fff'),
-    boxShadow: isDarkMode ? 'none' : '0 2px 4px rgba(0,0,0,0.05)'
+    boxShadow: isDarkMode ? 'none' : '0 2px 4px rgba(0,0,0,0.05)',
+    ...dndStyle // <--- MERGE DND STYLES
   };
 
   const btnBase = {
@@ -82,43 +95,49 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
   };
 
   return (
-    <div style={itemStyle}>
-      {/* 1. Subtask Indicator */}
-      {task.isSubtask && <span style={{ color: '#646cff', fontWeight: 'bold' }}>{">>"}</span>}
+    // 4. ATTACH REF
+    <div ref={setNodeRef} style={itemStyle}>
+      
+      {/* 5. DRAG HANDLE (Only show if not editing) */}
+      {!isEditing && (
+        <div 
+          {...attributes} 
+          {...listeners} 
+          style={{ cursor: 'grab', fontSize: '1.2rem', color: '#888', marginRight: '5px' }}
+          title="Drag to reorder"
+        >
+          ⠿
+        </div>
+      )}
 
-      {/* 2. Checkbox */}
-      <input
-        type="checkbox"
-        checked={task.completed}
-        onChange={() => onToggle(task.id)}
+      {task.isSubtask && <span style={{color: '#646cff', fontWeight: 'bold'}}>{">>"}</span>}
+
+      <input 
+        type="checkbox" 
+        checked={task.completed} 
+        onChange={() => onToggle(task.id)} 
         style={{ cursor: 'pointer', width: '18px', height: '18px' }}
       />
-
-      {/* 3. Content Area */}
+      
       <div style={{ flexGrow: 1 }}>
         {isEditing ? (
-          // --- EDIT MODE ---
           <div style={{ display: 'flex', gap: '5px' }}>
-            <input
-              type="text"
-              value={editText}
+            <input 
+              type="text" 
+              value={editText} 
               onChange={(e) => setEditText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              // Optional: Save on click away (Blur). 
-              // Careful: If you click "Cancel" button, this might trigger first.
-              // For now, let's strictly use buttons/keys for safety.
-              placeholder="Type subtask here..."
+              onKeyDown={handleKeyDown} 
+              placeholder="Type task here..."
               style={{ flexGrow: 1, padding: '5px', borderRadius: '4px', border: '1px solid #646cff', outline: 'none' }}
-              autoFocus // <--- Important: Focus immediately
+              autoFocus 
             />
             <button onClick={handleSave} style={{ ...btnBase, background: '#4caf50', color: '#fff' }}>Save</button>
             <button onClick={handleCancel} style={{ ...btnBase, background: '#999', color: '#fff' }}>Cancel</button>
           </div>
         ) : (
-          // --- VIEW MODE ---
-          <span
+          <span 
             onDoubleClick={() => setIsEditing(true)}
-            style={{
+            style={{ 
               textDecoration: task.completed ? 'line-through' : 'none',
               color: task.completed ? '#888' : 'inherit',
               fontSize: task.isSubtask ? '0.95rem' : '1rem',
@@ -132,43 +151,16 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
         )}
       </div>
 
-      {/* 4. Action Buttons */}
       {!isEditing && (
         <div style={{ display: 'flex', gap: '4px' }}>
-
-          <button
-            onClick={() => setIsEditing(true)}
-            title="Edit"
-            style={{ ...btnBase, color: '#646cff', border: '1px solid #646cff' }}
-          >
-            Edit
-          </button>
-
-          {!task.isSubtask && (
-            <button
-              onClick={handleAddSubClick}
-              title="Add Subtask"
-              style={{ ...btnBase, color: '#646cff', fontWeight: 'bold' }}
-            >
-              + Sub
-            </button>
-          )}
-
-          <button
-            onClick={handleDelete}
-            style={{ ...btnBase, color: '#ff4d4f' }}
-            title="Delete"
-          >
-            Delete
-          </button>
+          <button onClick={() => setIsEditing(true)} style={{ ...btnBase, color: '#646cff', border: '1px solid #646cff' }}>Edit</button>
+          {!task.isSubtask && <button onClick={handleAddSubClick} style={{ ...btnBase, color: '#646cff', fontWeight: 'bold' }}>+ Sub</button>}
+          <button onClick={handleDelete} style={{ ...btnBase, color: '#ff4d4f' }}>Delete</button>
         </div>
       )}
 
-      {/* Details Link */}
       {!task.isSubtask && !isEditing && (
-        <Link to={`/task/${task.id}`} style={{ fontSize: '0.8rem', textDecoration: 'none', color: '#888', marginLeft: '5px' }}>
-          Details
-        </Link>
+        <Link to={`/task/${task.id}`} style={{ fontSize: '0.8rem', textDecoration: 'none', color: '#888', marginLeft: '5px' }}>Details</Link>
       )}
     </div>
   );

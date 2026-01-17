@@ -1,113 +1,81 @@
----
+# Smart AI Task Manager
 
-# Smart AI To-Do App (React Capstone)
+A sophisticated task management application built with React, Vite, and Google Gemini AI. This project demonstrates advanced frontend architecture, implementing features such as AI-powered task decomposition, hierarchical state management, and strict type handling in a modern JavaScript environment.
 
-A "Smart" Task Manager built with React, Vite, and Google Gemini AI. This project demonstrates mastery of modern React patterns including **Custom Hooks**, **Context API**, **Global State Management**, and **AI Integration**.
+## Project Overview
 
-## Component Architecture
+This application serves as a technical demonstration of integrating Large Language Models (LLMs) into productivity tools. It extends standard CRUD functionality with intelligent task breakdowns, recursive state synchronization, and a complex drag-and-drop interface.
 
-The following graph illustrates how data flows through the application and which components manage state vs. display UI.
+## Technical Stack
 
-```mermaid
-graph TD
-    %% Global Providers
-    Root[main.jsx] --> ThemeProvider[Context: ThemeProvider]
-    ThemeProvider --> Router[BrowserRouter]
-    Router --> App[App.jsx]
+### Core Framework & Build Tooling
+* **React (v18+):** Functional component architecture utilizing Hooks for state and side-effect management.
+* **Vite:** Utilized for optimized development server performance and efficient production bundling.
+* **JavaScript (ES6+):** Modern syntax including async/await, restructuring, and modules.
 
-    %% Routes
-    App -->|Route /| Dashboard[Dashboard.jsx]
-    App -->|Route /task/:id| TaskDetail[TaskDetail.jsx]
-    App -->|Route /about| About[About.jsx]
+### State Management & Logic
+* **Context API:** Implements a global provider pattern for application-wide theme state.
+* **Custom Hooks:** Encapsulates API interactions (`useGemini`) and persistence logic to separate concerns from UI components.
+* **LocalStorage API:** Manages client-side data persistence with automatic hydration on application load.
 
-    %% Dashboard Children
-    Dashboard -->|Props: onAdd| TaskInput[TaskInput.jsx]
-    Dashboard -->|Props: task, onToggle| TaskItem[TaskItem.jsx]
-
-    %% Hooks Integration
-    Dashboard -.->|Uses| useGemini[Hook: useGemini]
-    Dashboard -.->|Uses| useLocalStorage[Effect: Persistence]
-
-    %% Styling
-    classDef container fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef component fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
-    classDef hook fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5;
-
-    class Root,ThemeProvider,Router,App container;
-    class Dashboard,TaskDetail,About,TaskInput,TaskItem component;
-    class useGemini,useLocalStorage hook;
-
-```
-
----
-
-## Curriculum Mapping (Feature vs. Lesson)
-
-This project was built to satisfy specific learning outcomes. Here is how each component maps to the course lessons:
-
-| Component / File | Functionality | **Lesson Covered** |
-| --- | --- | --- |
-| **`Dashboard.jsx`** | Manages the main list state (`tasks`) and CRUD logic. | **L4: State** |
-| **`TaskItem.jsx`** | Receives data via props to display individual rows. | **L4: Props** |
-| **`TaskInput.jsx`** | Uses Ant Design / CSS for layout. | **L5: UI Libraries** |
-| **`useGemini.js`** | Async function to call Google Gemini API for subtasks. | **L6: Async & AI** |
-| **`Dashboard.jsx`** | Uses `useEffect` to save tasks to `localStorage`. | **L7: Side Effects** |
-| **`ThemeContext.jsx`** | Global Dark/Light mode provider to avoid prop drilling. | **L8: Context API** |
-| **`App.jsx`** | Manages navigation between Dashboard, Details, and About. | **L9: Routing** |
-| **`TaskDetail.jsx`** | Uses `useParams` hook to read the URL ID. | **L10: Hooks** |
-| **`useGemini.js`** | A custom hook that isolates API logic from UI. | **L11: Custom Hooks** |
-| **`About.jsx`** | Explains React vs. Vue/Angular state concepts. | **L12/13: Concepts** |
-| **Vercel** | Project is hosted live with CI/CD. | **L14: Deployment** |
-
----
+### Libraries & Dependencies
+* **@dnd-kit/core & @dnd-kit/sortable:** Provides the primitives for the drag-and-drop interface, handling collision detection, sensors, and sorting strategies.
+* **@google/generative-ai:** The official SDK for interfacing with the Gemini 2.5 Flash model.
+* **React Router DOM (v6):** Handles client-side routing and dynamic URL parameter extraction.
 
 ## Key Features
 
-### 1. AI-Powered Task Breakdown
+### 1. AI-Powered Task Decomposition
+The application leverages the Google Gemini API to programmatically analyze high-level tasks. When triggered, the system asynchronously requests a breakdown of the parent task into actionable subtasks, which are then parsed and injected into the local state graph.
+* **Code Reference:** `src/hooks/useGemini.js`
 
-Instead of manually typing sub-tasks, users can click the **Magic Wand (✨)** button. The app sends the task to **Google Gemini 2.5**, which intelligently breaks it down into actionable steps.
+### 2. Hierarchical State Synchronization
+The application maintains strict consistency between Parent and Child tasks through recursive logic:
+* **Cascading Updates (Parent to Child):** Toggling a parent task triggers an immediate update to all associated child tasks, ensuring they inherit the parent's completion status.
+* **Bubbling Consistency (Child to Parent):** The system monitors child tasks; if a single child is unmarked, the parent is automatically marked incomplete. Conversely, if all children are completed, the parent status automatically updates to complete.
+* **Cascading Deletes:** Deletion of a parent node results in the immediate removal of all child nodes from the dataset.
 
-* *Code Location:* `src/hooks/useGemini.js`
+### 3. Intelligent Drag-and-Drop
+Implements complex reordering logic using `@dnd-kit`.
+* **Smart Grouping:** Moving a parent task automatically identifies and relocates all associated subtasks to the new position, maintaining the logical group structure.
+* **Collision Handling:** The system includes safety checks to prevent users from dropping a parent task inside the subtask list of another parent, automatically correcting the insertion index to the nearest valid position.
 
-### 2. Global Theme Manager
+### 4. Inline Interaction
+* **Keyboard Navigation:** Supports `Enter` to save and `Escape` to cancel during edit modes.
+* **Auto-Edit:** Creating a blank subtask automatically triggers edit mode for immediate input.
+* **Blank Task Handling:** The system automatically cleans up (deletes) tasks that are saved with empty content to maintain data integrity.
 
-Implemented a robust **Context Provider** to manage Dark/Light mode. The preference is persisted in local storage, ensuring the user's choice is remembered across sessions.
+## Architecture
 
-* *Code Location:* `src/context/ThemeContext.jsx`
+* **`main.jsx`**: Application entry point; initializes the Theme Provider.
+* **`Dashboard.jsx`**: The primary controller. It manages the central `tasks` state array and contains the logic for CRUD operations, recursion, and drag-and-drop event handling.
+* **`TaskItem.jsx`**: A presentational component that handles individual node rendering, indentation logic based on task type, and local edit state.
+* **`TaskDetail.jsx`**: A dynamic route component that fetches and displays extended metadata (ID, timestamps) for a specific task entity.
 
-### 3. Data Persistence
+## Installation & Setup
 
-Tasks are automatically synchronized with the browser's Local Storage using `useEffect`. Data is never lost on refresh.
+1.  **Clone the repository**
+    ```bash
+    git clone [https://github.com/your-username/smart-todo-app.git](https://github.com/your-username/smart-todo-app.git)
+    cd smart-todo-app
+    ```
 
----
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
 
-## How to Run Locally
+3.  **Environment Configuration**
+    Create a `.env.local` file in the project root to configure the API client:
+    ```env
+    VITE_GEMINI_API_KEY=your_google_api_key_here
+    ```
 
-1. **Clone the repository**
-```bash
-git clone https://github.com/your-username/smart-todo-app.git
-cd smart-todo-app
+4.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
 
-```
+## Deployment
 
-
-2. **Install Dependencies**
-```bash
-npm install
-
-```
-
-
-3. **Setup Environment Variables**
-Create a `.env.local` file in the root directory:
-```env
-VITE_GEMINI_API_KEY=your_google_api_key_here
-
-```
-
-
-4. **Run the App**
-```bash
-npm run dev
-
-```
+This project is optimized for deployment on static hosting platforms such as Vercel or Netlify. Ensure the `VITE_GEMINI_API_KEY` environment variable is correctly configured in the hosting provider's settings panel.

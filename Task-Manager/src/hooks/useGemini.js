@@ -23,7 +23,7 @@ export function useGemini() {
       // prompt cho Gemini
       const prompt = `Act as a productivity assistant. 
       Task: "${taskTitle}". 
-      Break this down into multiple simple, actionable sub-tasks with clear instruction between 30 words. 
+      Break this down into multiple simple, actionable sub-tasks (around 3 to 5 subtasks) with clear instruction between 30 words. 
       Return ONLY the sub-tasks as a list. No intro.`;
 
       const result = await model.generateContent(prompt);
