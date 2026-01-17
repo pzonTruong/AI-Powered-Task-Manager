@@ -55,10 +55,6 @@ Implements complex reordering logic using `@dnd-kit`.
 ## Installation & Setup
 
 1.  **Clone the repository**
-    ```bash
-    git clone [https://github.com/pzonTruong/smart-todo-app.git](https://github.com/pzonTruong/smart-todo-app.git)
-    cd smart-todo-app
-    ```
 
 2.  **Install Dependencies**
     ```bash
