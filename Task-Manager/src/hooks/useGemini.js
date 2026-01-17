@@ -17,18 +17,20 @@ export function useGemini() {
       // 2026 Standard Model
       const model = genAI.getGenerativeModel({ 
         model: "gemini-2.5-flash", 
-        // If 2.5 fails, swap this string to "gemini-1.5-flash"
+        // Project chỉ cần 2.5-flash là ngon luôn
       });
 
+      // prompt cho Gemini
       const prompt = `Act as a productivity assistant. 
       Task: "${taskTitle}". 
-      Break this down into 3 simple, actionable sub-tasks. 
+      Break this down into multiple simple, actionable sub-tasks with clear instruction between 30 words. 
       Return ONLY the sub-tasks as a list. No intro.`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
 
+      // Xử lý chuỗi và biến thành sub task.
       const subtasks = text.split('\n')
         .map(line => line.replace(/^[\*\-]\s*/, '').trim())
         .filter(line => line.length > 0);
@@ -37,8 +39,8 @@ export function useGemini() {
 
     } catch (err) {
       console.error("Gemini Error:", err);
-      // Friendly error message for the UI
-      setError("Model not found. Try swapping 'gemini-2.5-flash' to 'gemini-1.5-flash' in useGemini.js"); 
+      // Bắt lỗi
+      setError("Sum Ting Wong"); 
       return [];
     } finally {
       setLoading(false);

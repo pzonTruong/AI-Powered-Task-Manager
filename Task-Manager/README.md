@@ -41,7 +41,7 @@ graph TD
 
 ---
 
-## 📚 Curriculum Mapping (Feature vs. Lesson)
+## Curriculum Mapping (Feature vs. Lesson)
 
 This project was built to satisfy specific learning outcomes. Here is how each component maps to the course lessons:
 

@@ -1,78 +1,175 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext'; // Import theme to handle colors
+import { useTheme } from '../context/ThemeContext';
 
-export default function TaskItem({ task, onToggle, onDelete }) {
+export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdit }) {
   const { isDarkMode } = useTheme();
 
-  // --- DYNAMIC STYLES ---
+  // LOGIC CHANGE: If text is empty, start in Edit Mode automatically
+  const [isEditing, setIsEditing] = useState(task.text === "");
+  const [editText, setEditText] = useState(task.text);
+
+  // Handle saving
+  const handleSave = () => {
+    if (editText.trim()) {
+      // Valid text: Save it
+      onEdit(task.id, editText);
+      setIsEditing(false);
+    } else {
+      // Empty text: Delete the task (don't allow blank tasks)
+      onDelete(task.id);
+    }
+  };
+
+  // Handle cancelling
+  const handleCancel = () => {
+    if (!task.text) {
+      // If it was a new blank task and user cancels -> Delete it
+      onDelete(task.id);
+    } else {
+      // If it was an existing task -> Revert text
+      setEditText(task.text);
+      setIsEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  // LOGIC CHANGE: Just call the parent function, no prompt needed
+  const handleAddSubClick = () => {
+    onAddSubtask(task.id);
+  };
+
+  const handleDelete = () => {
+    if (task.isSubtask) {
+      onDelete(task.id);
+    } else {
+      if (window.confirm('Delete this task and all its subtasks?')) {
+        onDelete(task.id);
+      }
+    }
+  };
+
   const itemStyle = {
-    display: 'flex', 
-    alignItems: 'center', 
-    margin: '8px 0', 
+    display: 'flex',
+    alignItems: 'center',
+    margin: '8px 0',
     gap: '10px',
-    padding: '10px',
+    padding: '12px',
     borderRadius: '8px',
     transition: 'all 0.2s',
-    
-    // Logic: If it is a subtask, indent it and make it slightly smaller
     marginLeft: task.isSubtask ? '40px' : '0px',
-    borderLeft: task.isSubtask ? '4px solid #646cff' : 'none', // Purple line
-    backgroundColor: isDarkMode 
-      ? (task.isSubtask ? '#2a2a2a' : '#333') // Dark mode colors
-      : (task.isSubtask ? '#f8f9fa' : '#fff'), // Light mode colors
-    
-    // Optional: Add a subtle shadow to main tasks
-    boxShadow: task.isSubtask ? 'none' : '0 2px 5px rgba(0,0,0,0.05)'
+    borderLeft: task.isSubtask ? '4px solid #646cff' : 'none',
+    backgroundColor: isDarkMode
+      ? (task.isSubtask ? '#2a2a2a' : '#333')
+      : (task.isSubtask ? '#f8f9fa' : '#fff'),
+    boxShadow: isDarkMode ? 'none' : '0 2px 4px rgba(0,0,0,0.05)'
+  };
+
+  const btnBase = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    padding: '4px 8px',
+    borderRadius: '4px'
   };
 
   return (
     <div style={itemStyle}>
-      {/* 1. Visual Icon for Subtasks */}
-      {task.isSubtask && <span style={{fontSize: '1.2rem', color: '#646cff'}}>↳</span>}
+      {/* 1. Subtask Indicator */}
+      {task.isSubtask && <span style={{ color: '#646cff', fontWeight: 'bold' }}>{">>"}</span>}
 
       {/* 2. Checkbox */}
-      <input 
-        type="checkbox" 
-        checked={task.completed} 
-        onChange={() => onToggle(task.id)} 
+      <input
+        type="checkbox"
+        checked={task.completed}
+        onChange={() => onToggle(task.id)}
         style={{ cursor: 'pointer', width: '18px', height: '18px' }}
       />
-      
-      {/* 3. Task Text */}
-      <span style={{ 
-        textDecoration: task.completed ? 'line-through' : 'none',
-        color: task.completed ? '#888' : 'inherit',
-        flexGrow: 1,
-        fontSize: task.isSubtask ? '0.95rem' : '1rem' // Slightly smaller text
-      }}>
-        {task.text}
-      </span>
 
-      {/* 4. Details Link (Only show for main tasks to keep UI clean?) */}
-      {!task.isSubtask && (
-        <Link 
-          to={`/task/${task.id}`} 
-          style={{ fontSize: '0.8rem', textDecoration: 'none', color: '#646cff' }}
-        >
-          🔍 Details
-        </Link>
+      {/* 3. Content Area */}
+      <div style={{ flexGrow: 1 }}>
+        {isEditing ? (
+          // --- EDIT MODE ---
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input
+              type="text"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              // Optional: Save on click away (Blur). 
+              // Careful: If you click "Cancel" button, this might trigger first.
+              // For now, let's strictly use buttons/keys for safety.
+              placeholder="Type subtask here..."
+              style={{ flexGrow: 1, padding: '5px', borderRadius: '4px', border: '1px solid #646cff', outline: 'none' }}
+              autoFocus // <--- Important: Focus immediately
+            />
+            <button onClick={handleSave} style={{ ...btnBase, background: '#4caf50', color: '#fff' }}>Save</button>
+            <button onClick={handleCancel} style={{ ...btnBase, background: '#999', color: '#fff' }}>Cancel</button>
+          </div>
+        ) : (
+          // --- VIEW MODE ---
+          <span
+            onDoubleClick={() => setIsEditing(true)}
+            style={{
+              textDecoration: task.completed ? 'line-through' : 'none',
+              color: task.completed ? '#888' : 'inherit',
+              fontSize: task.isSubtask ? '0.95rem' : '1rem',
+              cursor: 'text',
+              display: 'block',
+              width: '100%'
+            }}
+          >
+            {task.text}
+          </span>
+        )}
+      </div>
+
+      {/* 4. Action Buttons */}
+      {!isEditing && (
+        <div style={{ display: 'flex', gap: '4px' }}>
+
+          <button
+            onClick={() => setIsEditing(true)}
+            title="Edit"
+            style={{ ...btnBase, color: '#646cff', border: '1px solid #646cff' }}
+          >
+            Edit
+          </button>
+
+          {!task.isSubtask && (
+            <button
+              onClick={handleAddSubClick}
+              title="Add Subtask"
+              style={{ ...btnBase, color: '#646cff', fontWeight: 'bold' }}
+            >
+              + Sub
+            </button>
+          )}
+
+          <button
+            onClick={handleDelete}
+            style={{ ...btnBase, color: '#ff4d4f' }}
+            title="Delete"
+          >
+            Delete
+          </button>
+        </div>
       )}
 
-      {/* 5. Delete Button */}
-      <button 
-        onClick={() => onDelete(task.id)} 
-        style={{ 
-          background: 'none', 
-          border: 'none', 
-          color: '#ff4d4f', 
-          cursor: 'pointer',
-          fontSize: '1.1rem',
-          opacity: 0.7 
-        }}
-        title="Delete"
-      >
-        ✖
-      </button>
+      {/* Details Link */}
+      {!task.isSubtask && !isEditing && (
+        <Link to={`/task/${task.id}`} style={{ fontSize: '0.8rem', textDecoration: 'none', color: '#888', marginLeft: '5px' }}>
+          Details
+        </Link>
+      )}
     </div>
   );
 }
