@@ -1,235 +1,280 @@
 import { useState, useEffect } from 'react';
 import TaskInput from '../components/TaskInput';
 import TaskItem from '../components/TaskItem';
-import { useGemini } from '../hooks/useGemini';
+import { useGemini } from '../hooks/useGemini'; 
+import { useTheme } from '../context/ThemeContext'; 
 
-// 1. IMPORT DND COMPONENTS
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 export default function Dashboard() {
-    const [tasks, setTasks] = useState(() => {
-        const saved = localStorage.getItem('my-tasks');
-        return saved ? JSON.parse(saved) : [];
-    });
+  const { isDarkMode } = useTheme(); 
+  
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('my-tasks');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-    const { generateSubtasks, loading, error } = useGemini();
+  const { generateSubtasks, loading, error } = useGemini();
 
-    // 2. SETUP SENSORS (Detects mouse vs touch)
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Requires 5px move to start (prevents accidental clicks)
-        useSensor(KeyboardSensor)
-    );
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
 
-    useEffect(() => {
-        localStorage.setItem('my-tasks', JSON.stringify(tasks));
-    }, [tasks]);
+  useEffect(() => {
+    localStorage.setItem('my-tasks', JSON.stringify(tasks));
+  }, [tasks]);
 
-    // --- ACTIONS ---
-    const addTask = (text) => {
-        const newTask = { id: Date.now(), text, completed: false, isParent: true, createdAt: new Date().toISOString() };
-        setTasks([newTask, ...tasks]);
-    };
+  // --- ACTIONS ---
+  const addTask = (text) => {
+    const newTask = { id: Date.now(), text, completed: false, isParent: true, createdAt: new Date().toISOString() };
+    setTasks([newTask, ...tasks]);
+  };
 
-    const deleteTask = (id) => {
-        setTasks(prev => prev.filter(t => t.id !== id && t.parentId !== id));
-    };
+  const deleteTask = (id) => {
+    setTasks(prev => prev.filter(t => t.id !== id && t.parentId !== id));
+  };
 
-    const toggleTask = (id) => {
-        setTasks(prevTasks => {
-            // 1. Create a deep copy so we can edit freely
-            let updatedTasks = prevTasks.map(task => ({ ...task }));
+  const toggleTask = (id) => {
+    setTasks(prevTasks => {
+      let updatedTasks = prevTasks.map(task => ({ ...task }));
+      const clickedTask = updatedTasks.find(t => t.id === id);
+      if (!clickedTask) return prevTasks;
 
-            const clickedTask = updatedTasks.find(t => t.id === id);
-            if (!clickedTask) return prevTasks;
+      const newStatus = !clickedTask.completed;
+      clickedTask.completed = newStatus;
 
-            // 2. Determine the new status
-            const newStatus = !clickedTask.completed;
-            clickedTask.completed = newStatus;
-
-            // 3. CASCADE DOWN (If Parent clicked -> Sync Children)
-            if (clickedTask.isParent) {
-                updatedTasks.forEach(t => {
-                    if (t.parentId === clickedTask.id) {
-                        t.completed = newStatus;
-                    }
-                });
-            }
-
-            // 4. BUBBLE UP (Check ALL Parents for consistency)
-            // We loop through every parent to ensure their status matches their children
-            updatedTasks.forEach(parent => {
-                if (parent.isParent) {
-                    // Find children for this parent
-                    const children = updatedTasks.filter(t => t.parentId === parent.id);
-
-                    if (children.length > 0) {
-                        // Rule: Parent is complete ONLY if ALL children are complete
-                        const allChildrenDone = children.every(c => c.completed);
-                        parent.completed = allChildrenDone;
-                    }
-                }
-            });
-
-            return updatedTasks;
+      // Cascade Down (Sync children)
+      if (clickedTask.isParent) {
+        updatedTasks.forEach(t => {
+          if (t.parentId === clickedTask.id) t.completed = newStatus;
         });
-    };
+      }
 
-    const addSubtask = (parentId) => {
-        const newSubtask = { id: Date.now(), text: "", completed: false, isSubtask: true, parentId, createdAt: new Date().toISOString() };
-        setTasks(prev => {
-            const parentIndex = prev.findIndex(t => t.id === parentId);
-            const before = prev.slice(0, parentIndex + 1);
-            const after = prev.slice(parentIndex + 1);
-            return [...before, newSubtask, ...after];
-        });
-    };
-
-    const editTask = (id, newText) => {
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, text: newText } : t));
-    };
-
-    const handleMagicAdd = async (mainTaskText) => {
-        if (!mainTaskText) return;
-        const parentId = Date.now();
-        const newParent = { id: parentId, text: mainTaskText, completed: false, isParent: true, createdAt: new Date().toISOString() };
-        setTasks(prev => [newParent, ...prev]);
-
-        const subTasks = await generateSubtasks(mainTaskText);
-        if (subTasks.length > 0) {
-            const newSubTasks = subTasks.map((sub, index) => ({
-                id: parentId + index + 1, text: sub, completed: false, isSubtask: true, parentId, createdAt: new Date().toISOString()
-            }));
-            setTasks(prev => {
-                const parentIndex = prev.findIndex(t => t.id === parentId);
-                if (parentIndex === -1) return [...newSubTasks, ...prev];
-                const before = prev.slice(0, parentIndex + 1);
-                const after = prev.slice(parentIndex + 1);
-                return [...before, ...newSubTasks, ...after];
-            });
+      // Bubble Up (Sync parent)
+      updatedTasks.forEach(parent => {
+        if (parent.isParent) {
+          const children = updatedTasks.filter(t => t.parentId === parent.id);
+          if (children.length > 0) {
+            parent.completed = children.every(c => c.completed);
+          }
         }
-    };
+      });
 
-    // 3. HANDLE DRAG END (Reorder the array)
-    const handleDragEnd = (event) => {
-        const { active, over } = event;
+      return updatedTasks;
+    });
+  };
 
-        // If dropped outside or on itself, do nothing
-        if (!over || active.id === over.id) return;
+  const addSubtask = (parentId) => {
+    const newSubtask = { id: Date.now(), text: "", completed: false, isSubtask: true, parentId, createdAt: new Date().toISOString() };
+    setTasks(prev => {
+      const parentIndex = prev.findIndex(t => t.id === parentId);
+      const before = prev.slice(0, parentIndex + 1);
+      const after = prev.slice(parentIndex + 1);
+      return [...before, newSubtask, ...after];
+    });
+  };
 
-        setTasks((items) => {
-            const activeTask = items.find(t => t.id === active.id);
+  const editTask = (id, newText) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, text: newText } : t));
+  };
 
-            // 1. If moving a SUBTASK, just do the standard move (simple)
-            if (activeTask.isSubtask) {
-                const oldIndex = items.findIndex((t) => t.id === active.id);
-                const newIndex = items.findIndex((t) => t.id === over.id);
-                return arrayMove(items, oldIndex, newIndex);
-            }
+  const handleMagicAdd = async (mainTaskText) => {
+    if (!mainTaskText) return;
+    const parentId = Date.now();
+    const newParent = { id: parentId, text: mainTaskText, completed: false, isParent: true, createdAt: new Date().toISOString() };
+    setTasks(prev => [newParent, ...prev]);
 
-            // 2. If moving a PARENT, we must move the WHOLE FAMILY (Parent + Children)
-            //    AND ensure we don't land inside another family.
+    const subTasks = await generateSubtasks(mainTaskText);
+    if (subTasks.length > 0) {
+      const newSubTasks = subTasks.map((sub, index) => ({
+        id: parentId + index + 1, text: sub, completed: false, isSubtask: true, parentId, createdAt: new Date().toISOString()
+      }));
+      setTasks(prev => {
+        const parentIndex = prev.findIndex(t => t.id === parentId);
+        if (parentIndex === -1) return [...newSubTasks, ...prev];
+        const before = prev.slice(0, parentIndex + 1);
+        const after = prev.slice(parentIndex + 1);
+        return [...before, ...newSubTasks, ...after];
+      });
+    }
+  };
 
-            // A. Identify the Family to move
-            const familyIds = [activeTask.id, ...items.filter(t => t.parentId === activeTask.id).map(t => t.id)];
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-            // B. Create a "Clean List" (without the moving family)
-            const cleanList = items.filter(t => !familyIds.includes(t.id));
+    setTasks((items) => {
+      const activeTask = items.find(t => t.id === active.id);
+      
+      if (activeTask.isSubtask) {
+        const oldIndex = items.findIndex((t) => t.id === active.id);
+        const newIndex = items.findIndex((t) => t.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      }
 
-            // C. Find where the user TRIED to drop it.
-            // We look for the "over" task in the clean list to find the insertion point.
-            let insertIndex = cleanList.findIndex(t => t.id === over.id);
+      const familyIds = [activeTask.id, ...items.filter(t => t.parentId === activeTask.id).map(t => t.id)];
+      const cleanList = items.filter(t => !familyIds.includes(t.id));
+      let insertIndex = cleanList.findIndex(t => t.id === over.id);
+      if (insertIndex === -1) insertIndex = cleanList.length;
 
-            // If "over" task isn't in clean list (maybe we dragged over our own child?), default to end
-            if (insertIndex === -1) insertIndex = cleanList.length;
+      while (insertIndex < cleanList.length) {
+        const prevItem = cleanList[insertIndex - 1];
+        if (prevItem && prevItem.isSubtask) break; 
+        if (prevItem && prevItem.isParent) {
+           const hasChildren = cleanList.some(t => t.parentId === prevItem.id);
+           if (hasChildren) {
+             insertIndex++;
+             continue;
+           }
+        }
+        break;
+      }
 
-            // --- THE FIX: SAFETY CHECK ---
-            // We look at the neighbor ABOVE our insertion point.
-            // If the neighbor is a Subtask, or a Parent with children, we are "interrupting" a group.
-            // We must keep bumping our index down until we hit a "safe" spot (Start of a new Parent or End of list).
+      const itemsBefore = cleanList.slice(0, insertIndex);
+      const itemsAfter = cleanList.slice(insertIndex);
+      const movingFamily = [activeTask, ...items.filter(t => t.parentId === activeTask.id)];
+      return [...itemsBefore, ...movingFamily, ...itemsAfter];
+    });
+  };
 
-            while (insertIndex < cleanList.length) {
-                const neighborAbove = cleanList[insertIndex]; // The item currently occupying the spot
+  // --- FILTERING LOGIC ---
+  const doneParentIds = tasks
+    .filter(t => t.isParent && t.completed)
+    .map(t => t.id);
 
-                // If the spot is taken by a Subtask, we can't start a new Parent here. 
-                // We must go after it.
-                if (neighborAbove && neighborAbove.isSubtask) {
-                    insertIndex++;
-                    continue;
-                }
+  // Active: Parents NOT done, or Subtasks whose parent is NOT done
+  const activeTasks = tasks.filter(t => {
+    if (t.isParent) return !t.completed;
+    return !doneParentIds.includes(t.parentId);
+  });
 
-                // If the spot is a Parent, but it belongs to the PREVIOUS group (we are splitting parent/child),
-                // we normally insert BEFORE. But dnd-kit index logic can be tricky.
-                // Let's stick to the "Subtask" check primarily. 
-                // If we land on a Subtask, push down.
+  // Completed: Parents WHO ARE done, and their subtasks
+  const doneTasks = tasks.filter(t => {
+    if (t.isParent) return t.completed;
+    return doneParentIds.includes(t.parentId);
+  });
 
-                // Wait, looking at the neighbor *above* (index-1) is safer logic.
-                const prevItem = cleanList[insertIndex - 1];
+  // --- STATS ---
+  const totalTasks = tasks.filter(t => t.isParent).length;
+  const completedCount = tasks.filter(t => t.isParent && t.completed).length;
+  const progress = totalTasks === 0 ? 0 : Math.round((completedCount / totalTasks) * 100);
 
-                if (prevItem && prevItem.isSubtask) {
-                    // We are sitting right after a subtask. This is usually SAFE (end of group).
-                    // UNLESS... wait, actually sitting after a subtask is the SAFEST place.
-                    // The danger is sitting after a PARENT that has children.
+  // --- STYLES ---
+  const containerStyle = { 
+    padding: '20px', 
+    maxWidth: '800px', 
+    margin: '0 auto',
+    color: isDarkMode ? '#eee' : '#333'
+  };
 
-                    // Let's reverse the check:
-                    // If we are inserting AFTER a Parent, and that Parent has children in the clean list...
-                    // We must skip over those children.
-                    break; // Actually, if prev is subtask, we are likely fine.
-                }
+  const progressContainerStyle = { 
+    marginBottom: '30px', 
+    padding: '25px', 
+    background: isDarkMode ? 'linear-gradient(145deg, #2a2a2a, #333)' : 'linear-gradient(145deg, #ffffff, #f0f0f0)', 
+    borderRadius: '16px',
+    boxShadow: isDarkMode ? '0 4px 15px rgba(0,0,0,0.4)' : '0 10px 25px rgba(0,0,0,0.05)',
+    border: isDarkMode ? '1px solid #444' : '1px solid #fff'
+  };
 
-                if (prevItem && prevItem.isParent) {
-                    // We are inserting directly under a Parent.
-                    // Does this parent have children in the clean list?
-                    const hasChildren = cleanList.some(t => t.parentId === prevItem.id);
-                    if (hasChildren) {
-                        // DANGER: We are splitting Parent from Children.
-                        // Push insertIndex down by 1 to let the child stay with parent.
-                        insertIndex++;
-                        continue;
-                    }
-                }
+  const barBackgroundStyle = { 
+    height: '14px', 
+    background: isDarkMode ? '#444' : '#e0e0e0', 
+    borderRadius: '7px', 
+    overflow: 'hidden',
+    marginTop: '15px'
+  };
 
-                // If we pass checks, we are safe.
-                break;
-            }
+  const barFillStyle = { 
+    width: `${progress}%`, 
+    height: '100%', 
+    background: progress === 100 
+      ? 'linear-gradient(90deg, #4caf50, #81c784)' 
+      : 'linear-gradient(90deg, #646cff, #9f7aea)', 
+    borderRadius: '7px',
+    transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+  };
 
-            // D. Reconstruct the list
-            const itemsBefore = cleanList.slice(0, insertIndex);
-            const itemsAfter = cleanList.slice(insertIndex);
+  return (
+    <div style={containerStyle}>
+      <h1 style={{ marginBottom: '20px' }}>Smart Task Manager</h1>
 
-            // Get the actual task objects for the moving family
-            const movingFamily = [activeTask, ...items.filter(t => t.parentId === activeTask.id)];
-
-            return [...itemsBefore, ...movingFamily, ...itemsAfter];
-        });
-    };
-
-    return (
-        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
-            <h1>Smart Project Manager</h1>
-
-            {loading && <p style={{ color: '#646cff' }}>✨ AI is thinking...</p>}
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-
-            <TaskInput onAddTask={addTask} onMagicAdd={handleMagicAdd} isLoading={loading} />
-
-            {/* 4. WRAP LIST IN DND CONTEXT */}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={tasks} strategy={verticalListSortingStrategy}>
-                    <div>
-                        {tasks.map(task => (
-                            <TaskItem
-                                key={task.id}
-                                task={task}
-                                onToggle={toggleTask}
-                                onDelete={deleteTask}
-                                onAddSubtask={addSubtask}
-                                onEdit={editTask}
-                            />
-                        ))}
-                    </div>
-                </SortableContext>
-            </DndContext>
+      <div style={progressContainerStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Project Velocity</h2>
+            <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+              {completedCount} of {totalTasks} major tasks completed
+            </span>
+          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: isDarkMode ? '#fff' : '#444' }}>
+            {progress}%
+          </div>
         </div>
-    );
+        <div style={barBackgroundStyle}>
+          <div style={barFillStyle} />
+        </div>
+      </div>
+
+      {loading && <p style={{color: '#646cff', fontWeight: 'bold', animation: 'pulse 1s infinite'}}>AI is structuring your plan...</p>}
+      {error && <p style={{color: '#ff4d4f', background: 'rgba(255, 77, 79, 0.1)', padding: '10px', borderRadius: '8px'}}>{error}</p>}
+
+      <TaskInput onAddTask={addTask} onMagicAdd={handleMagicAdd} isLoading={loading} />
+
+      {/* ACTIVE SECTION */}
+      <h3 style={{ borderBottom: isDarkMode ? '1px solid #444' : '2px solid #f0f0f0', paddingBottom: '10px', marginTop: '40px' }}>
+        In Progress ({activeTasks.length})
+      </h3>
+      
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={activeTasks} strategy={verticalListSortingStrategy}>
+          <div style={{ minHeight: '50px' }}>
+            {activeTasks.length === 0 && (
+              <p style={{color: '#888', fontStyle: 'italic', textAlign: 'center', padding: '20px'}}>
+                Everything is clear! Time to relax or add more.
+              </p>
+            )}
+            
+            {activeTasks.map(task => (
+              <TaskItem 
+                key={task.id} 
+                task={task} 
+                onToggle={toggleTask} 
+                onDelete={deleteTask}
+                onAddSubtask={addSubtask}
+                onEdit={editTask}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {/* COMPLETED SECTION */}
+      {doneTasks.length > 0 && (
+        <>
+          <h3 style={{ borderBottom: isDarkMode ? '1px solid #444' : '2px solid #f0f0f0', paddingBottom: '10px', marginTop: '40px', color: '#888' }}>
+            Completed ({doneTasks.length})
+          </h3>
+          {/* UPDATED STYLE: ALLOWS CLICKS */}
+          <div style={{ 
+            opacity: 0.6, 
+            filter: 'grayscale(20%)', 
+            transition: 'all 0.3s ease'
+          }}>
+            {doneTasks.map(task => (
+              <TaskItem 
+                key={task.id} 
+                task={task} 
+                onToggle={toggleTask} // This will now work
+                onDelete={deleteTask}
+                onAddSubtask={addSubtask}
+                onEdit={editTask}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
