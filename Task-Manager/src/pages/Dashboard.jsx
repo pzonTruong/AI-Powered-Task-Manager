@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import TaskInput from '../components/TaskInput';
 import TaskItem from '../components/TaskItem';
-import { useGemini } from '../hooks/useGemini'; 
-import { useTheme } from '../context/ThemeContext'; 
+import { useGemini } from '../hooks/useGemini';
+import { useTheme } from '../context/ThemeContext';
+import { AnimatePresence } from 'framer-motion';
 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 export default function Dashboard() {
-  const { isDarkMode } = useTheme(); 
-  
+  const { isDarkMode } = useTheme();
+
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem('my-tasks');
     return saved ? JSON.parse(saved) : [];
@@ -107,7 +108,7 @@ export default function Dashboard() {
 
     setTasks((items) => {
       const activeTask = items.find(t => t.id === active.id);
-      
+
       if (activeTask.isSubtask) {
         const oldIndex = items.findIndex((t) => t.id === active.id);
         const newIndex = items.findIndex((t) => t.id === over.id);
@@ -121,13 +122,13 @@ export default function Dashboard() {
 
       while (insertIndex < cleanList.length) {
         const prevItem = cleanList[insertIndex - 1];
-        if (prevItem && prevItem.isSubtask) break; 
+        if (prevItem && prevItem.isSubtask) break;
         if (prevItem && prevItem.isParent) {
-           const hasChildren = cleanList.some(t => t.parentId === prevItem.id);
-           if (hasChildren) {
-             insertIndex++;
-             continue;
-           }
+          const hasChildren = cleanList.some(t => t.parentId === prevItem.id);
+          if (hasChildren) {
+            insertIndex++;
+            continue;
+          }
         }
         break;
       }
@@ -162,36 +163,36 @@ export default function Dashboard() {
   const progress = totalTasks === 0 ? 0 : Math.round((completedCount / totalTasks) * 100);
 
   // --- STYLES ---
-  const containerStyle = { 
-    padding: '20px', 
-    maxWidth: '800px', 
+  const containerStyle = {
+    padding: '20px',
+    maxWidth: '800px',
     margin: '0 auto',
     color: isDarkMode ? '#eee' : '#333'
   };
 
-  const progressContainerStyle = { 
-    marginBottom: '30px', 
-    padding: '25px', 
-    background: isDarkMode ? 'linear-gradient(145deg, #2a2a2a, #333)' : 'linear-gradient(145deg, #ffffff, #f0f0f0)', 
+  const progressContainerStyle = {
+    marginBottom: '30px',
+    padding: '25px',
+    background: isDarkMode ? 'linear-gradient(145deg, #2a2a2a, #333)' : 'linear-gradient(145deg, #ffffff, #f0f0f0)',
     borderRadius: '16px',
     boxShadow: isDarkMode ? '0 4px 15px rgba(0,0,0,0.4)' : '0 10px 25px rgba(0,0,0,0.05)',
     border: isDarkMode ? '1px solid #444' : '1px solid #fff'
   };
 
-  const barBackgroundStyle = { 
-    height: '14px', 
-    background: isDarkMode ? '#444' : '#e0e0e0', 
-    borderRadius: '7px', 
+  const barBackgroundStyle = {
+    height: '14px',
+    background: isDarkMode ? '#444' : '#e0e0e0',
+    borderRadius: '7px',
     overflow: 'hidden',
     marginTop: '15px'
   };
 
-  const barFillStyle = { 
-    width: `${progress}%`, 
-    height: '100%', 
-    background: progress === 100 
-      ? 'linear-gradient(90deg, #4caf50, #81c784)' 
-      : 'linear-gradient(90deg, #646cff, #9f7aea)', 
+  const barFillStyle = {
+    width: `${progress}%`,
+    height: '100%',
+    background: progress === 100
+      ? 'linear-gradient(90deg, #4caf50, #81c784)'
+      : 'linear-gradient(90deg, #646cff, #9f7aea)',
     borderRadius: '7px',
     transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
   };
@@ -217,8 +218,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {loading && <p style={{color: '#646cff', fontWeight: 'bold', animation: 'pulse 1s infinite'}}>AI is structuring your plan...</p>}
-      {error && <p style={{color: '#ff4d4f', background: 'rgba(255, 77, 79, 0.1)', padding: '10px', borderRadius: '8px'}}>{error}</p>}
+      {loading && <p style={{ color: '#646cff', fontWeight: 'bold', animation: 'pulse 1s infinite' }}>AI is structuring your plan...</p>}
+      {error && <p style={{ color: '#ff4d4f', background: 'rgba(255, 77, 79, 0.1)', padding: '10px', borderRadius: '8px' }}>{error}</p>}
 
       <TaskInput onAddTask={addTask} onMagicAdd={handleMagicAdd} isLoading={loading} />
 
@@ -226,26 +227,28 @@ export default function Dashboard() {
       <h3 style={{ borderBottom: isDarkMode ? '1px solid #444' : '2px solid #f0f0f0', paddingBottom: '10px', marginTop: '40px' }}>
         In Progress ({activeTasks.length})
       </h3>
-      
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={activeTasks} strategy={verticalListSortingStrategy}>
           <div style={{ minHeight: '50px' }}>
             {activeTasks.length === 0 && (
-              <p style={{color: '#888', fontStyle: 'italic', textAlign: 'center', padding: '20px'}}>
+              <p style={{ color: '#888', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
                 Everything is clear! Time to relax or add more.
               </p>
             )}
-            
-            {activeTasks.map(task => (
-              <TaskItem 
-                key={task.id} 
-                task={task} 
-                onToggle={toggleTask} 
-                onDelete={deleteTask}
-                onAddSubtask={addSubtask}
-                onEdit={editTask}
-              />
-            ))}
+            <AnimatePresence mode='popLayout'>
+              {activeTasks.map(task => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggle={toggleTask}
+                  onDelete={deleteTask}
+                  onAddSubtask={addSubtask}
+                  onEdit={editTask}
+                />
+              ))}
+            </AnimatePresence>
+
           </div>
         </SortableContext>
       </DndContext>
@@ -257,21 +260,23 @@ export default function Dashboard() {
             Completed ({doneTasks.length})
           </h3>
           {/* UPDATED STYLE: ALLOWS CLICKS */}
-          <div style={{ 
-            opacity: 0.6, 
-            filter: 'grayscale(20%)', 
+          <div style={{
+            opacity: 0.6,
+            filter: 'grayscale(20%)',
             transition: 'all 0.3s ease'
           }}>
-            {doneTasks.map(task => (
-              <TaskItem 
-                key={task.id} 
-                task={task} 
-                onToggle={toggleTask} // This will now work
-                onDelete={deleteTask}
-                onAddSubtask={addSubtask}
-                onEdit={editTask}
-              />
-            ))}
+            <AnimatePresence mode='popLayout'>
+              {doneTasks.map(task => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggle={toggleTask} // This will now work
+                  onDelete={deleteTask}
+                  onAddSubtask={addSubtask}
+                  onEdit={editTask}
+                />
+              ))}
+            </AnimatePresence>
           </div>
         </>
       )}

@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-// 1. IMPORT DND-KIT HOOKS
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+// 1. IMPORT MOTION
+import { motion } from 'framer-motion';
 
 export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdit }) {
   const { isDarkMode } = useTheme();
   
-  // 2. SETUP SORTABLE HOOK
   const {
     attributes,
     listeners,
@@ -18,19 +19,20 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
     isDragging
   } = useSortable({ id: task.id });
 
-  // 3. DEFINE DRAG STYLE
+  // 2. MERGE DND STYLES WITH ANIMATION STYLES
+  // We apply the DND transform here, but we let Framer handle the entry/exit
   const dndStyle = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1, // Fade out while dragging
+    transition, // Keep DND transition for dragging
     zIndex: isDragging ? 999 : 'auto',
     position: 'relative',
-    touchAction: 'none' // Important for mobile dragging
+    touchAction: 'none'
   };
 
   const [isEditing, setIsEditing] = useState(task.text === "");
   const [editText, setEditText] = useState(task.text);
 
+  // ... (Keep your existing Logic handlers: handleSave, handleCancel, handleKeyDown, etc.) ...
   const handleSave = () => {
     if (editText.trim()) {
       onEdit(task.id, editText);
@@ -54,35 +56,32 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
     else if (e.key === 'Escape') handleCancel();
   };
 
-  const handleAddSubClick = () => {
-    onAddSubtask(task.id);
-  };
+  const handleAddSubClick = () => onAddSubtask(task.id);
 
   const handleDelete = () => {
     if (task.isSubtask) {
       onDelete(task.id);
     } else {
-      if (window.confirm('Delete this task and all its subtasks?')) {
-        onDelete(task.id);
-      }
+      if (window.confirm('Delete this task and all its subtasks?')) onDelete(task.id);
     }
   };
 
-  const itemStyle = {
+  // 3. DEFINE VISUAL STYLES (Colors, Borders)
+  const visualStyle = {
     display: 'flex', 
     alignItems: 'center', 
     margin: '8px 0', 
     gap: '10px',
     padding: '12px',
     borderRadius: '8px',
-    // Logic: Indent if subtask
     marginLeft: task.isSubtask ? '40px' : '0px',
     borderLeft: task.isSubtask ? '4px solid #646cff' : 'none',
     backgroundColor: isDarkMode 
       ? (task.isSubtask ? '#2a2a2a' : '#333') 
       : (task.isSubtask ? '#f8f9fa' : '#fff'),
     boxShadow: isDarkMode ? 'none' : '0 2px 4px rgba(0,0,0,0.05)',
-    ...dndStyle // <--- MERGE DND STYLES
+    opacity: isDragging ? 0.5 : 1, // Fade while dragging
+    ...dndStyle // Apply DND transforms
   };
 
   const btnBase = {
@@ -94,17 +93,26 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
     borderRadius: '4px'
   };
 
+  // 4. THE ANIMATED RENDER
   return (
-    // 4. ATTACH REF
-    <div ref={setNodeRef} style={itemStyle}>
+    <motion.div
+      ref={setNodeRef}
+      style={visualStyle}
       
-      {/* 5. DRAG HANDLE (Only show if not editing) */}
+      // ANIMATION CONFIGURATION
+      layout // Smoothly slide other items around when this one moves/deletes
+      initial={{ opacity: 0, y: -20, scale: 0.95 }} // Start slightly above and transparent
+      animate={{ opacity: 1, y: 0, scale: 1 }}      // Animate to normal
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }} // Shrink on delete
+      
+      {...attributes} // DND Accessibility
+    >
+      
+      {/* Drag Handle */}
       {!isEditing && (
         <div 
-          {...attributes} 
-          {...listeners} 
+          {...listeners} // Only the handle triggers drag
           style={{ cursor: 'grab', fontSize: '1.2rem', color: '#888', marginRight: '5px' }}
-          title="Drag to reorder"
         >
           ⠿
         </div>
@@ -162,6 +170,6 @@ export default function TaskItem({ task, onToggle, onDelete, onAddSubtask, onEdi
       {!task.isSubtask && !isEditing && (
         <Link to={`/task/${task.id}`} style={{ fontSize: '0.8rem', textDecoration: 'none', color: '#888', marginLeft: '5px' }}>Details</Link>
       )}
-    </div>
+    </motion.div>
   );
 }
